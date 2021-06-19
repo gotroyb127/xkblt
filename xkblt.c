@@ -1,10 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <X11/Xlib.h>
 #include <X11/XKBlib.h>
+#include <X11/extensions/XKBrules.h>
 
 #include "arg.h"
 
-#define err(r, msg)\
+#define die(r, msg)\
 	do {\
 		fprintf(stderr, "%s: %s.\n", argv0, msg);\
 		exit(r);\
@@ -18,15 +22,13 @@ int setflag;
 int setto;
 int setsign;
 int curr;
-int grpn;
 Atom *grps;
 Display *dpy;
-XkbDescPtr kb;
 
 void
 usage(void)
 {
-	err(1, "usage: %s [-l | -n] [[-t | -a | -s] number]");
+	die(1, "usage: %s [-l | -n] [[-t | -a | -s] number]");
 }
 
 void
@@ -35,25 +37,16 @@ init(void)
 	XkbStateRec state;
 
 	if (!(dpy = XOpenDisplay(NULL)))
-		err(1, "failed to open display");
-	if (!(kb = XkbAllocKeyboard()))
-		err(1, "failed to allocate keyboard");
-	if (XkbGetNames(dpy, XkbGroupNamesMask, kb))
-		err(1, "failed to get Group names");
+		die(1, "cannot open display");
 	if (XkbGetState(dpy, XkbUseCoreKbd, &state))
-		err(1, "failed to get keyboard state");
+		die(1, "cannot get keyboard state");
 
 	curr = state.group;
-	/* count groups */
-	for (grps = kb->names->groups, grpn = 1;
-	     grpn < XkbNumKbdGroups && grps[grpn];
-	     grpn++);
 }
 
 void
 cleanup(void)
 {
-	XFree(kb);
 	XCloseDisplay(dpy);
 }
 
@@ -61,19 +54,28 @@ void
 printlt(void)
 {
 	int i;
-	char *name;
+	char *tmp, *str, *tok;
+	XkbRF_VarDefsRec vd;
 
-	for (i = 0; i < grpn; i++) {
+	if (!XkbRF_GetNamesProp(dpy, &tmp, &vd))
+		die(1, "cannot extract keyboard properties");
+
+	if (!(str = strdup(vd.layout)))
+		die(1, "strdup failed");
+
+	tok = strtok(str, ",");
+	for (i = 0; tok; tok = strtok(NULL, ","), i++) {
 		if (i != curr && !lstflag)
 			continue;
-		if (nmbrflag) {
+		if (nmbrflag)
 			printf("%d\n", i);
-		} else {
-			name = XGetAtomName(dpy, grps[i]);
-			puts(name);
-			XFree(name);
-		}
+		else
+			puts(tok);
 	}
+
+	free(str);
+	free(tmp);
+	XFree(vd.options);
 }
 
 void
@@ -93,10 +95,8 @@ main(int argc, char *argv[])
 		nmbrflag = 1;
 		break;
 	case 'a':
-		/* FALLTHROUGH */
 	case 's':
 		setsign = ARGC() == 'a' ? 1 : -1;
-		/* FALLTHROUGH */
 	case 't':
 		setflag = 1;
 		setto = strtol(EARGF(usage()), NULL, 10);

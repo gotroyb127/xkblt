@@ -8,11 +8,11 @@ PREFIX = /usr/local
 
 # includes and libs
 INCS = -I${X11INC}
-LIBS = -L${X11LIB} -lX11
+LIBS = -L${X11LIB} -lX11 -lxkbfile
 
 # flags
-CPPFLAGS =
-CFLAGS   = -std=c99 -pedantic -Wall -Os ${INCS} ${CPPFLAGS}
+CPPFLAGS = -D_POSIX_C_SOURCE=200809L
+CFLAGS   = -std=c99 -Wpedantic -Wall -Os ${INCS} ${CPPFLAGS}
 LDFLAGS  = ${LIBS}
 
 # compiler and linker
